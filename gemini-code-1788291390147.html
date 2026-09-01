@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The CapCut System | Jack Young</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              400: '#22d3ee',
+              500: '#00f2fe',
+              600: '#4facfe'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.3.1",
+        "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+        "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+        "three": "https://esm.sh/three@0.160.0",
+        "gsap": "https://esm.sh/gsap@3.12.5"
+      }
+    }
+  </script>
+</head>
+<body class="bg-black text-slate-100 antialiased selection:bg-white selection:text-black min-h-screen relative overflow-x-hidden">
+
+  <canvas id="framer-orbital-canvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
+
+  <script>
+    (function () {
+      const canvas = document.getElementById('framer-orbital-canvas');
+      const ctx = canvas.getContext('2d');
+
+      const config = {
+        dotSize: 1.0,          
+        gridSpacing: 20,       
+        impactRadius: 65,      
+        orbitSpeed: 0.07,      
+        dampening: 0.20,       
+        scaleOnHover: 2.0,     
+        enableOrbiting: true
+      };
+
+      let width = 0;
+      let height = 0;
+      let dpr = window.devicePixelRatio || 1;
+      let dots = [];
+      let mouse = { x: -2000, y: -2000 };
+      let globalTime = 0;
+
+      class OrbitalDot {
+        constructor(x, y) {
+          this.originX = x;
+          this.originY = y;
+          this.x = x;
+          this.y = y;
+
+          this.inclination = Math.random() * Math.PI;
+          this.ascension = Math.random() * Math.PI * 2;
+          this.phaseOffset = Math.random() * Math.PI * 2;
+          this.orbitRadius = 8 + Math.random() * 18;
+
+          this.orbitWeight = 0;
+          this.scale = config.dotSize;
+          this.alpha = 0.20;
+        }
+
+        update() {
+          const dx = mouse.x - this.originX;
+          const dy = mouse.y - this.originY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          let targetWeight = 0;
+          if (dist < config.impactRadius) {
+            targetWeight = Math.pow(1 - dist / config.impactRadius, 1.4);
+          }
+
+          this.orbitWeight += (targetWeight - this.orbitWeight) * config.dampening;
+
+          if (config.enableOrbiting && this.orbitWeight > 0.001) {
+            const theta = globalTime * config.orbitSpeed + this.phaseOffset;
+            
+            const rawX = Math.cos(theta) * this.orbitRadius;
+            const rawY = Math.sin(theta) * this.orbitRadius;
+
+            const cosInc = Math.cos(this.inclination);
+            const sinInc = Math.sin(this.inclination);
+            const cosAsc = Math.cos(this.ascension);
+            const sinAsc = Math.sin(this.ascension);
+
+            const x3d = rawX * cosAsc - rawY * cosInc * sinAsc;
+            const y3d = rawX * sinAsc + rawY * cosInc * cosAsc;
+            const z3d = rawY * sinInc;
+
+            const perspective = 1 + z3d * 0.02;
+            const targetX = this.originX + x3d * perspective;
+            const targetY = this.originY + y3d * perspective;
+
+            this.x = this.originX + (targetX - this.originX) * this.orbitWeight;
+            this.y = this.originY + (targetY - this.originY) * this.orbitWeight;
+
+            this.scale = (config.dotSize + (config.scaleOnHover - config.dotSize) * this.orbitWeight) * perspective;
+            this.alpha = 0.20 + this.orbitWeight * 0.80;
+          } else {
+            this.x = this.originX;
+            this.y = this.originY;
+            this.scale = config.dotSize;
+            this.alpha = 0.20;
+          }
+        }
+
+        draw() {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, Math.max(0.4, this.scale), 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+          ctx.fill();
+        }
+      }
+
+      function initGrid() {
+        dots = [];
+        const cols = Math.floor(width / config.gridSpacing);
+        const rows = Math.floor(height / config.gridSpacing);
+        const startX = (width - cols * config.gridSpacing) / 2;
+        const startY = (height - rows * config.gridSpacing) / 2;
+
+        for (let i = 0; i <= cols; i++) {
+          for (let j = 0; j <= rows; j++) {
+            dots.push(new OrbitalDot(startX + i * config.gridSpacing, startY + j * config.gridSpacing));
+          }
+        }
+      }
+
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        dpr = window.devicePixelRatio || 1;
+
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+
+        ctx.scale(dpr, dpr);
+        initGrid();
+      }
+
+      const resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(document.body);
+
+      window.addEventListener('mousemove', (e) => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+      });
+
+      window.addEventListener('mouseleave', () => {
+        mouse.x = -2000;
+        mouse.y = -2000;
+      });
+
+      function animate() {
+        globalTime += 1;
+        ctx.clearRect(0, 0, width, height);
+
+        for (let i = 0; i < dots.length; i++) {
+          dots[i].update();
+          dots[i].draw();
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      resize();
+      animate();
+    })();
+  </script>
+
+  <div class="relative z-10">
+
+    <nav class="sticky top-0 z-50 backdrop-blur-md bg-black/60 border-b border-white/[0.08] px-6 py-4">
+      <div class="max-w-6xl mx-auto flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-white text-black flex items-center justify-center font-black text-xs">CC</div>
+          <span class="font-bold tracking-tight text-white text-sm sm:text-base">The CapCut System</span>
+        </div>
+        <div class="hidden md:flex items-center gap-8 text-xs font-medium text-slate-400">
+          <a href="#about" class="hover:text-white transition">About</a>
+          <a href="#results" class="hover:text-white transition">Results</a>
+          <a href="#curriculum" class="hover:text-white transition">Programme</a>
+          <a href="#comparison" class="hover:text-white transition">Why Us</a>
+          <a href="#faq" class="hover:text-white transition">FAQ</a>
+        </div>
+        <a href="#apply" class="px-5 py-2 text-xs font-semibold uppercase tracking-wider rounded-full bg-white text-black hover:bg-slate-200 transition">
+          Apply Now &rarr;
+        </a>
+      </div>
+    </nav>
+
+    <header class="relative pt-20 pb-2 px-6 max-w-6xl mx-auto text-center">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-300 text-xs font-medium mb-8 backdrop-blur-md">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        250+ Members Inside · Verified Results
+      </div>
+      
+      <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight leading-[1.12] max-w-4xl mx-auto mb-6 text-white">
+        The most gatekept side hustle. <br/>
+        <span class="text-slate-300">
+          I made $40k from it last month.
+        </span>
+      </h1>
+
+      <p class="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto mb-10 leading-relaxed font-normal">
+        The exact framework Jack used to go from student to the #1 ranked CapCut creator in the UK with 10.2B+ views.
+      </p>
+
+      <div class="relative max-w-3xl mx-auto rounded-2xl overflow-hidden border border-white/10 bg-black shadow-2xl aspect-video group mb-8 backdrop-blur-md">
+        <video 
+          id="vsl-player" 
+          class="w-full h-full object-cover" 
+          controls 
+          muted
+          playsinline 
+          preload="metadata"
+        >
+          <source src="creat_an_artistic_vid_about_an.mp4" type="video/mp4">
+          Your browser does not support the video tag.
+        </video>
+      </div>
+
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+        <a href="#apply" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-white text-black font-bold text-sm sm:text-base hover:bg-slate-200 transition shadow-lg">
+          Apply to Join The System &rarr;
+        </a>
+      </div>
+    </header>
+
+    <section id="about" class="py-12 px-6 max-w-6xl mx-auto relative z-10">
+      <div class="text-center max-w-3xl mx-auto mb-10">
+        <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">About</h2>
+        <p class="text-3xl font-extrabold text-white">The CapCut AI Template Creator Programm</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <div class="group relative rounded-3xl bg-white/[0.03] hover:bg-white/[0.05] border border-white/10 hover:border-cyan-400/40 p-8 sm:p-10 backdrop-blur-2xl transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_25px_50px_rgba(0,0,0,0.9),0_0_30px_rgba(34,211,238,0.15)] flex flex-col justify-between">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-semibold mb-6">
+              <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> The Initiative
+            </div>
+            <h3 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-4">What it is ?</h3>
+            <p class="text-slate-300 text-sm sm:text-base leading-relaxed font-normal">
+              The CapCut AI Template Creator Program (ATCP) is an initiative designed for prompt artists and AI-native creators to turn their repeatable workflows into interactive templates that CapCut users can apply instantly.
+            </p>
+          </div>
+        </div>
+
+        <div class="group relative rounded-3xl bg-white/[0.03] hover:bg-white/[0.05] border border-white/10 hover:border-emerald-500/40 p-8 sm:p-10 backdrop-blur-2xl transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_25px_50px_rgba(0,0,0,0.9),0_0_30px_rgba(16,185,129,0.15)] flex flex-col justify-between">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-6">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Ideal Profile
+            </div>
+            <h3 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-4">Who We're Looking For ?</h3>
+            <p class="text-slate-300 text-sm sm:text-base leading-relaxed font-normal">
+              We’re looking for AI creators who love sharing their unique prompts, workflows, and short-form videos. If you’re passionate about your craft and want a platform that values your authorship, clear attribution, and monetizing your work, you’ll fit right in.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="results" class="py-8 px-6 max-w-6xl mx-auto">
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+        <div>
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-3">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Live Platform Feed
+          </div>
+          <h2 class="text-3xl sm:text-4xl font-black text-white tracking-tight">Verified Member Payouts</h2>
+        </div>
+        <p class="text-slate-400 text-xs sm:text-sm max-w-md">Every single earnings screenshot is audited directly from creator dashboards and payouts.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <div class="group relative rounded-3xl bg-white/[0.03] hover:bg-white/[0.05] border border-white/10 hover:border-cyan-400/40 p-8 backdrop-blur-2xl transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_25px_50px_rgba(0,0,0,0.9),0_0_30px_rgba(34,211,238,0.15)] flex flex-col justify-between">
+          <div class="absolute -top-3 right-6 px-3 py-1 rounded-full bg-cyan-400 text-black font-extrabold text-[10px] tracking-wider uppercase shadow-lg">
+            FOUNDER RECORD
+          </div>
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-6">
+              <span class="font-mono uppercase tracking-widest text-[11px] text-slate-500">CAPCUT DASH</span>
+              <span class="text-emerald-400 flex items-center gap-1 font-semibold">● Verified Payout</span>
+            </div>
+            <p class="text-slate-400 text-xs font-medium uppercase tracking-wider">30-DAY REWARDS</p>
+            <p class="text-4xl sm:text-5xl font-black text-white tracking-tight mt-1 mb-2">$39,414</p>
+            <p class="text-xs text-slate-400 leading-relaxed">Generated exclusively across viral template exports and creator tier bonuses.</p>
+          </div>
+          <div class="mt-8 pt-5 border-t border-white/[0.08] flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-bold text-xs text-white">JY</div>
+              <div>
+                <p class="text-xs font-bold text-white leading-none">Jack Young</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">#1 Ranked Creator</p>
+              </div>
+            </div>
+            <span class="text-[11px] font-mono text-cyan-300">Level 6 Max</span>
+          </div>
+        </div>
+
+        <div class="group relative rounded-3xl bg-white/[0.03] hover:bg-white/[0.05] border border-white/10 hover:border-white/20 p-8 backdrop-blur-2xl transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_25px_50px_rgba(0,0,0,0.9)] flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-6">
+              <span class="font-mono uppercase tracking-widest text-[11px] text-slate-500">STUDENT INTAKE</span>
+              <span class="text-emerald-400 flex items-center gap-1 font-semibold">● Month 3</span>
+            </div>
+            <p class="text-slate-400 text-xs font-medium uppercase tracking-wider">TOTAL EARNINGS</p>
+            <p class="text-4xl sm:text-5xl font-black text-white tracking-tight mt-1 mb-2">$27,200<span class="text-cyan-400 text-3xl">+</span></p>
+            <p class="text-xs text-slate-400 leading-relaxed">Scaled from 0 to over 150M+ template exports using the prompt automated framework.</p>
+          </div>
+          <div class="mt-8 pt-5 border-t border-white/[0.08] flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-bold text-xs text-white">KP</div>
+              <div>
+                <p class="text-xs font-bold text-white leading-none">Kai Phillips</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Community Member</p>
+              </div>
+            </div>
+            <span class="text-[11px] font-mono text-slate-400">Verified</span>
+          </div>
+        </div>
+
+        <div class="group relative rounded-3xl bg-white/[0.03] hover:bg-white/[0.05] border border-white/10 hover:border-white/20 p-8 backdrop-blur-2xl transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_25px_50px_rgba(0,0,0,0.9)] flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-6">
+              <span class="font-mono uppercase tracking-widest text-[11px] text-slate-500">NICHE TEMPLATES</span>
+              <span class="text-emerald-400 flex items-center gap-1 font-semibold">● Passive Stack</span>
+            </div>
+            <p class="text-slate-400 text-xs font-medium uppercase tracking-wider">PAYOUT RECEIVED</p>
+            <p class="text-4xl sm:text-5xl font-black text-white tracking-tight mt-1 mb-2">$18,300<span class="text-cyan-400 text-3xl">+</span></p>
+            <p class="text-xs text-slate-400 leading-relaxed">Generated across AI video generation workflows without showing any face on camera.</p>
+          </div>
+          <div class="mt-8 pt-5 border-t border-white/[0.08] flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center font-bold text-xs text-white">TV</div>
+              <div>
+                <p class="text-xs font-bold text-white leading-none">Titan Vision</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Community Member</p>
+              </div>
+            </div>
+            <span class="text-[11px] font-mono text-slate-400">Verified</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="w-screen relative left-1/2 -translate-x-1/2 my-4 py-2 overflow-hidden pointer-events-auto bg-transparent">
+      <div class="w-full h-[340px] sm:h-[420px] relative bg-transparent">
+        <div id="liquid-glass-carousel-root" class="w-full h-full relative bg-transparent"></div>
+      </div>
+    </section>
+
+    <section class="py-10 px-6 max-w-6xl mx-auto">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        
+        <div class="group relative rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/20 backdrop-blur-xl p-6 sm:p-8 flex flex-col items-center justify-center text-center transition-all duration-300 ease-out hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(0,0,0,0.8),0_0_25px_rgba(255,255,255,0.06)]">
+          <div class="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+          <p class="text-3xl sm:text-5xl font-black tracking-tight text-white group-hover:scale-105 transition-transform duration-300">250+</p>
+          <p class="text-[11px] sm:text-xs text-slate-400 mt-2 font-semibold tracking-wider uppercase">Active Members</p>
+        </div>
+
+        <div class="group relative rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/20 backdrop-blur-xl p-6 sm:p-8 flex flex-col items-center justify-center text-center transition-all duration-300 ease-out hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(0,0,0,0.8),0_0_25px_rgba(255,255,255,0.06)]">
+          <div class="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+          <p class="text-3xl sm:text-5xl font-black tracking-tight text-white group-hover:scale-105 transition-transform duration-300">10.2B</p>
+          <p class="text-[11px] sm:text-xs text-slate-400 mt-2 font-semibold tracking-wider uppercase">Platform Views</p>
+        </div>
+
+        <div class="group relative rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/20 backdrop-blur-xl p-6 sm:p-8 flex flex-col items-center justify-center text-center transition-all duration-300 ease-out hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(0,0,0,0.8),0_0_25px_rgba(255,255,255,0.06)]">
+          <div class="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+          <p class="text-3xl sm:text-5xl font-black tracking-tight text-white group-hover:scale-105 transition-transform duration-300">#1 UK</p>
+          <p class="text-[11px] sm:text-xs text-slate-400 mt-2 font-semibold tracking-wider uppercase">CapCut Ranking</p>
+        </div>
+
+        <div class="group relative rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-emerald-500/30 backdrop-blur-xl p-6 sm:p-8 flex flex-col items-center justify-center text-center transition-all duration-300 ease-out hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(0,0,0,0.8),0_0_25px_rgba(16,185,129,0.15)]">
+          <div class="absolute inset-0 rounded-2xl bg-gradient-to-b from-emerald-500/[0.05] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+          <p class="text-3xl sm:text-5xl font-black tracking-tight text-emerald-400 flex items-center justify-center gap-1.5 group-hover:scale-105 transition-transform duration-300">
+            5.0 <span class="text-2xl sm:text-4xl text-emerald-400">★</span>
+          </p>
+          <p class="text-[11px] sm:text-xs text-slate-400 mt-2 font-semibold tracking-wider uppercase">17 Verified Reviews</p>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="curriculum" class="py-20 px-6 max-w-6xl mx-auto">
+      <div class="text-center max-w-2xl mx-auto mb-16">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-300 text-xs font-semibold mb-3 backdrop-blur-md">
+          Curriculum & Tools
+        </div>
+        <h2 class="text-3xl sm:text-5xl font-black text-white tracking-tight">The 3-Pillar Master System</h2>
+        <p class="text-slate-400 mt-3 text-sm">Everything engineered to take you from a fresh installation to compound daily payouts.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+        
+        <div class="md:col-span-7 group rounded-3xl bg-gradient-to-br from-white/[0.05] via-white/[0.02] to-transparent border border-white/[0.09] p-8 sm:p-10 backdrop-blur-xl hover:border-cyan-400/30 transition-all duration-300 flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-cyan-400/10 border border-cyan-400/20 text-cyan-400 flex items-center justify-center font-black text-lg mb-6">
+              01
+            </div>
+            <h3 class="text-2xl font-bold text-white mb-3">The Private Inner Circle & Mastermind</h3>
+            <p class="text-slate-400 text-sm leading-relaxed mb-6">
+              Skip the trial-and-error cycle. Gain 24/7 access to 250+ top template producers with continuous audits, daily viral trend alerts, and monthly in-person creator meetups.
+            </p>
+          </div>
+          <div class="grid grid-cols-2 gap-3 pt-6 border-t border-white/[0.08]">
+            <div class="p-3.5 rounded-xl bg-black/40 border border-white/5 text-xs text-slate-300 font-medium flex items-center gap-2">
+              <span class="text-emerald-400">✓</span> Daily Viral Trend Logs
+            </div>
+            <div class="p-3.5 rounded-xl bg-black/40 border border-white/5 text-xs text-slate-300 font-medium flex items-center gap-2">
+              <span class="text-emerald-400">✓</span> In-Person VIP Meetups
+            </div>
+          </div>
+        </div>
+
+        <div class="md:col-span-5 group rounded-3xl bg-gradient-to-br from-white/[0.05] via-white/[0.02] to-transparent border border-white/[0.09] p-8 sm:p-10 backdrop-blur-xl hover:border-white/20 transition-all duration-300 flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-white/10 border border-white/10 text-white flex items-center justify-center font-black text-lg mb-6">
+              02
+            </div>
+            <h3 class="text-2xl font-bold text-white mb-3">AI & Prompt Engine Vault</h3>
+            <p class="text-slate-400 text-sm leading-relaxed mb-6">
+              Pre-engineered prompt libraries that write viral hooks and generate high-retention video assets in under 60 seconds.
+            </p>
+          </div>
+          <div class="space-y-2.5 pt-6 border-t border-white/[0.08]">
+            <div class="flex items-center justify-between text-xs py-1 text-slate-300">
+              <span>Ready-to-Use XML Files</span>
+              <span class="text-emerald-400 font-mono">Included</span>
+            </div>
+            <div class="flex items-center justify-between text-xs py-1 text-slate-300">
+              <span>Weekly New Prompts</span>
+              <span class="text-emerald-400 font-mono">Live</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="md:col-span-12 group rounded-3xl bg-gradient-to-br from-white/[0.05] via-white/[0.02] to-transparent border border-white/[0.09] p-8 sm:p-10 backdrop-blur-xl hover:border-cyan-400/30 transition-all duration-300">
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+            <div class="md:col-span-7">
+              <div class="w-12 h-12 rounded-2xl bg-white/10 border border-white/10 text-white flex items-center justify-center font-black text-lg mb-6">
+                03
+              </div>
+              <h3 class="text-2xl sm:text-3xl font-bold text-white mb-3">The Multi-Account Monetisation Playbook</h3>
+              <p class="text-slate-400 text-sm leading-relaxed mb-6">
+                Master the exact algorithm rules that determine creator tier progression, optimize your export bonuses, and protect your accounts with clean multi-device posting configurations.
+              </p>
+              <div class="flex flex-wrap gap-2.5">
+                <span class="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-300">Incentive Rules Decoded</span>
+                <span class="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-300">Multi-Account VPN Matrix</span>
+                <span class="px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-300">Revenue Tracking Spreadsheet</span>
+              </div>
+            </div>
+            <div class="md:col-span-5 p-6 rounded-2xl bg-black/60 border border-white/10 flex flex-col justify-center space-y-4">
+              <div class="flex justify-between items-center text-xs pb-3 border-b border-white/[0.08]">
+                <span class="text-slate-400">Average Payout / 1M Exports</span>
+                <span class="text-white font-bold">$1,200 – $2,400</span>
+              </div>
+              <div class="flex justify-between items-center text-xs pb-3 border-b border-white/[0.08]">
+                <span class="text-slate-400">Weekly Time Required</span>
+                <span class="text-white font-bold">4 – 6 Hours</span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-slate-400">Experience Needed</span>
+                <span class="text-emerald-400 font-bold">Beginner Friendly</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="comparison" class="py-20 px-6 max-w-5xl mx-auto">
+      <div class="text-center mb-14">
+        <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">The Real Difference</h2>
+        <p class="text-3xl sm:text-4xl font-black text-white tracking-tight">Why going alone costs more time and money</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <div class="rounded-3xl bg-red-950/[0.12] border border-red-500/20 p-8 sm:p-10 backdrop-blur-xl relative overflow-hidden">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-red-500/10 text-red-400 text-xs font-bold uppercase tracking-wider mb-6">
+            ✕ Figuring It Out Alone
+          </div>
+          <ul class="space-y-4 text-sm text-slate-400">
+            <li class="flex items-start gap-3">
+              <span class="text-red-400 font-bold">✕</span>
+              <span>Wasting months creating dead templates with 0 downloads</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-red-400 font-bold">✕</span>
+              <span>Zero feedback on why CapCut rejected your creator application</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-red-400 font-bold">✕</span>
+              <span>Constantly falling behind new algorithm payout updates</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-red-400 font-bold">✕</span>
+              <span>Quitting early due to lack of guidance and accountability</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="rounded-3xl bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-white/20 p-8 sm:p-10 backdrop-blur-xl relative overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)]">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-6">
+            ✓ The CapCut System
+          </div>
+          <ul class="space-y-4 text-sm text-slate-200">
+            <li class="flex items-start gap-3">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>The blueprint that generated over 10.2 Billion platform views</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>Direct 1-on-1 template audits from Jack and top UK creators</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>Pre-engineered prompt automation to produce viral formats in minutes</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>Active Discord community with live masterminds and meetups</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="faq" class="py-20 px-6 max-w-3xl mx-auto">
+      <div class="text-center mb-12">
+        <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Got Questions?</h2>
+        <p class="text-3xl sm:text-4xl font-black text-white tracking-tight">Frequently Asked Questions</p>
+      </div>
+
+      <div class="space-y-3.5 text-xs sm:text-sm">
+        
+        <details class="p-6 rounded-2xl bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.08] group backdrop-blur-xl transition-all cursor-pointer">
+          <summary class="font-bold text-white list-none flex justify-between items-center text-sm sm:text-base">
+            I have never edited in CapCut before. Is this suitable for me?
+            <span class="text-slate-400 group-open:rotate-180 transition-transform duration-300 text-xs">▼</span>
+          </summary>
+          <p class="text-slate-400 mt-4 leading-relaxed text-xs sm:text-sm">
+            Yes. The entire system is built to take complete beginners from zero to publishing monetisable templates without prior video editing experience.
+          </p>
+        </details>
+
+        <details class="p-6 rounded-2xl bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.08] group backdrop-blur-xl transition-all cursor-pointer">
+          <summary class="font-semibold text-white list-none flex justify-between items-center text-sm sm:text-base">
+            How much time do I need to commit weekly?
+            <span class="text-slate-400 group-open:rotate-180 transition-transform duration-300 text-xs">▼</span>
+          </summary>
+          <p class="text-slate-400 mt-4 leading-relaxed text-xs sm:text-sm">
+            A few hours per week (around 4–6 hours) is enough to create and schedule your templates while keeping a job or studying.
+          </p>
+        </details>
+
+        <details class="p-6 rounded-2xl bg-white/[0.03] hover:bg-white/[0.05] border border-white/[0.08] group backdrop-blur-xl transition-all cursor-pointer">
+          <summary class="font-semibold text-white list-none flex justify-between items-center text-sm sm:text-base">
+            What happens after I submit my application?
+            <span class="text-slate-400 group-open:rotate-180 transition-transform duration-300 text-xs">▼</span>
+          </summary>
+          <p class="text-slate-400 mt-4 leading-relaxed text-xs sm:text-sm">
+            We review your profile to make sure you are a good fit and reach out within 24 hours to schedule your onboarding call.
+          </p>
+        </details>
+
+      </div>
+    </section>
+
+    <section id="apply" class="py-24 px-6 text-center max-w-4xl mx-auto">
+      <div class="p-12 sm:p-16 rounded-3xl bg-gradient-to-b from-white/[0.08] via-white/[0.02] to-black border border-white/20 shadow-[0_30px_70px_rgba(0,0,0,0.9),0_0_40px_rgba(255,255,255,0.08)] backdrop-blur-2xl">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-6">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Applications Open For This Cohort
+        </div>
+        <h2 class="text-3xl sm:text-5xl font-black text-white tracking-tight mb-4">Start Earning on CapCut</h2>
+        <p class="text-slate-400 max-w-xl mx-auto mb-8 text-xs sm:text-base leading-relaxed">
+          Join 250+ creators building predictable passive income with viral templates.
+        </p>
+        <a href="#apply" class="inline-block px-10 py-4 rounded-xl bg-white text-black font-extrabold text-sm sm:text-base hover:bg-slate-200 transition shadow-[0_0_30px_rgba(255,255,255,0.3)]">
+          Apply to Join The System &rarr;
+        </a>
+        <p class="text-[11px] text-slate-500 mt-4">Takes ~2 minutes · Response guaranteed within 24 hours</p>
+      </div>
+    </section>
+
+    <footer class="border-t border-white/[0.08] py-8 text-center text-xs text-slate-600">
+      <p>© 2026 The CapCut System. All rights reserved.</p>
+    </footer>
+
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const video = document.getElementById('vsl-player');
+      if (video) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              video.play().catch(() => {});
+            } else {
+              video.pause();
+            }
+          });
+        }, { threshold: 0.40 });
+        observer.observe(video);
+      }
+    });
+  </script>
+
+  <script type="module">
+    import React from "react";
+    import { createRoot } from "react-dom/client";
+    import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+    import * as THREE from "three";
+    import * as GsapModule from "gsap";
+
+    const gsap = GsapModule.gsap ?? GsapModule.default ?? GsapModule;
+
+    function toPlainText(value) {
+      if (value == null) return "";
+      return String(value)
+        .replace(/<[^>]*>/g, "")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/g, "'")
+        .trim();
+    }
+
+    const fragmentShader = `
+      #define PI 3.14159265
+      precision highp float;
+      varying vec2 vUv;
+      uniform sampler2D uTex;
+      uniform vec2  uRes;
+      uniform vec2  uCenter;
+      uniform float uSizeX;
+      uniform float uSizeY;
+      uniform float uAspect;
+      uniform float uZoom;
+      uniform float uDispersion;
+      uniform float uBlur;
+      uniform float uGlow;
+      uniform float uWhiteGlow;
+      uniform float uNovaSize;
+      uniform float uBlueRing;
+      uniform float uRingRadius;
+      uniform float uRingWidth;
+      uniform float uShimmer;
+      uniform float uShimmerFreq;
+      uniform float uShimmerSpeed;
+      uniform float uShimmerDepth;
+      uniform float uTime;
+      uniform float uRimStart;
+      uniform float uRimTangential;
+      uniform float uRimInward;
+      uniform float uRimFreq1;
+      uniform float uRimFreq2;
+      uniform vec3  uBlueColor;
+      uniform float uRimLine;
+      uniform float uRimLinePos;
+      uniform float uRimLineWidth;
+      uniform float uShape;
+      uniform float uSquareRound;
+      uniform float uRotation;
+      uniform int   uSamples;
+
+      const int MAX_SAMPLES = 16;
+
+      float sdRoundBox(vec2 p, vec2 b, float r) {
+          vec2 q = abs(p) - b + r;
+          return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+      }
+
+      vec4 glassLens(vec2 center, float aspectCorrect) {
+          vec2 p = vUv - center;
+          p.x *= aspectCorrect;
+          float ca = cos(uRotation), sa = sin(uRotation);
+          p = mat2(ca, -sa, sa, ca) * p;
+          vec2 halfSize = vec2(uSizeX, uSizeY);
+          float dist = length(p / halfSize);
+
+          float maskND;
+          if (uShape > 0.5) {
+              float corner = min(uSizeX, uSizeY) * clamp(uSquareRound, 0.0, 1.0);
+              float sd = sdRoundBox(p, halfSize, corner);
+              maskND = 1.0 + sd / min(uSizeX, uSizeY);
+          } else {
+              maskND = dist;
+          }
+
+          if (maskND > 1.0) return vec4(0.0);
+
+          float shapeND = clamp(maskND, 0.0, 1.0);
+          float nd = clamp(dist, 0.0, 1.0);
+          vec2 offset = vUv - center;
+          vec2 radialDir = normalize(offset + 1e-6);
+          vec2 tangentDir = vec2(-radialDir.y, radialDir.x);
+          float angle = atan(p.y, p.x);
+
+          float pull = uZoom * 0.18 * nd * nd;
+          float rimStrength = smoothstep(uRimStart, 1.0, nd);
+          float fluidWave = sin(angle * uRimFreq1) * 0.4 +
+                            sin(angle * uRimFreq2) * 0.2;
+          float rScreen = (uSizeX + uSizeY) * 0.5;
+
+          vec2 rimOff = tangentDir * fluidWave * rimStrength *
+                        rScreen * uRimTangential;
+          vec2 rimPull = -radialDir * rimStrength * rScreen * uRimInward;
+          vec2 baseUV = center + offset * (1.0 - pull) + rimOff + rimPull;
+
+          float rimMask = smoothstep(0.4, 1.0, nd);
+          vec2 dispDir = offset * uDispersion * 0.002 * rimMask;
+
+          int count = uSamples;
+          if (count < 2) count = 2;
+          if (count > MAX_SAMPLES) count = MAX_SAMPLES;
+
+          vec4 col = vec4(0.0);
+          vec3 caW = vec3(0.0);
+
+          for (int i = 0; i < MAX_SAMPLES; i++) {
+              if (i >= count) break;
+
+              float t = float(i) / float(count - 1);
+              vec2 sUV = baseUV + dispDir * (t - 0.5);
+              vec4 sampleColor = texture2D(uTex, sUV);
+
+              vec3 weight = vec3(
+                  exp(-pow((t - 0.00) / 0.38, 2.0)),
+                  exp(-pow((t - 0.50) / 0.38, 2.0)),
+                  exp(-pow((t - 1.00) / 0.38, 2.0))
+              );
+
+              col.rgb += sampleColor.rgb * weight;
+              col.a += sampleColor.a * ((weight.r + weight.g + weight.b) / 3.0);
+              caW += weight;
+          }
+
+          col.rgb /= max(caW, vec3(0.001));
+          col.a /= max((caW.r + caW.g + caW.b) / 3.0, 0.001);
+
+          float blurFade = 1.0 - smoothstep(0.72, 0.98, nd);
+
+          if (uBlur > 0.01 && blurFade > 0.01) {
+              vec2 blurRad = vec2(uBlur) / uRes * blurFade;
+              vec4 bcol = vec4(0.0);
+              float totalWeight = 0.0;
+
+              for (float a = 0.0; a < PI * 2.0; a += PI * 2.0 / 6.0) {
+                  for (float rr = 0.4; rr <= 1.001; rr += 0.3) {
+                      vec2 o = vec2(cos(a), sin(a)) * blurRad * rr;
+                      float weight = 1.0 - rr * 0.38;
+                      bcol += texture2D(uTex, baseUV + o) * weight;
+                      totalWeight += weight;
+                  }
+              }
+
+              col = mix(bcol / totalWeight, col, rimMask);
+          }
+
+          col.rgb *= mix(0.96, 1.0, smoothstep(0.0, 0.38, shapeND));
+
+          float r2 = shapeND * shapeND * 0.25;
+          float gs = max(uNovaSize * uGlow * 0.002, 0.003);
+          float nova = exp(-r2 / gs) + exp(-r2 / (gs * 7.0)) * 0.12;
+          nova *= uWhiteGlow * (uGlow / 17.0) * 0.6;
+          col.rgb += vec3(nova);
+
+          float dC = shapeND * 0.5;
+          float tR = clamp(uRingRadius, 0.1, 0.49);
+          float rW = max(uRingWidth, 0.004);
+
+          float ring = exp(-pow((dC - tR) / rW, 2.0));
+          ring *= uBlueRing * (uGlow / 17.0) * 0.8;
+
+          if (uShimmer > 0.5) {
+              ring *= sin(angle * uShimmerFreq + uTime * uShimmerSpeed) *
+                      uShimmerDepth + (1.0 - uShimmerDepth);
+          }
+
+          float aura = exp(-pow((dC - tR) / (rW * 7.0), 2.0)) *
+                       0.15 * uBlueRing * (uGlow / 17.0);
+
+          col.rgb += uBlueColor * (ring + aura);
+
+          float lensAlpha = smoothstep(1.0, 0.70, maskND);
+          col.a = max(col.a, lensAlpha * 0.85);
+
+          return col;
+      }
+
+      void main() {
+          vec4 texColor = texture2D(uTex, vUv);
+          vec4 lensColor = glassLens(uCenter, uAspect);
+          
+          vec4 finalColor = mix(texColor, lensColor, lensColor.a);
+          gl_FragColor = finalColor;
+      }
+    `;
+
+    function makePlaceholderTexture(index, label) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1200;
+      canvas.height = 800;
+      const ctx = canvas.getContext("2d");
+      const hue = (index * 47 + 210) % 360;
+      const gradient = ctx.createLinearGradient(0, 0, 1200, 800);
+      gradient.addColorStop(0, `hsl(${hue}, 72%, 58%)`);
+      gradient.addColorStop(1, `hsl(${(hue + 80) % 360}, 70%, 22%)`);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "rgba(255,255,255,.95)";
+      ctx.font = "600 66px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(toPlainText(label) || `Template ${index + 1}`, 600, 400);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    function createCarousel(mount, options) {
+      const { projects, propsRef, cursorElement, staticMode, onActiveChange, onFocusChange, onEntryDone } = options;
+      const cfg = () => propsRef.current;
+      const sourceProjects = projects.length ? projects : [
+        { brand: "Aesthetic Velocity", description: "Viral CapCut Formula" },
+        { brand: "3D Split Zoom", description: "High Retention Transition" },
+        { brand: "Dark Atmosphere", description: "Prompt Vault Master" }
+      ];
+
+      let W = Math.max(1, mount.clientWidth);
+      let H = Math.max(1, mount.clientHeight);
+      
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: false });
+      const dpr = Math.min(window.devicePixelRatio || 1, cfg().pixelRatio);
+      renderer.setPixelRatio(dpr);
+      renderer.setSize(W, H);
+      renderer.setClearColor(0x000000, 0);
+      renderer.domElement.style.width = "100%";
+      renderer.domElement.style.height = "100%";
+      renderer.domElement.style.display = "block";
+      renderer.domElement.style.touchAction = "none";
+      renderer.domElement.style.background = "transparent";
+      mount.style.touchAction = "none";
+      mount.appendChild(renderer.domElement);
+
+      const panelHeightPx = () => {
+        const base = cfg().panelHeight;
+        const byHeight = H * 0.62;
+        const byWidth = W * 0.78;
+        return Math.max(90, Math.min(base, byHeight, byWidth));
+      };
+
+      const gapPx = () => {
+        const scale = panelHeightPx() / Math.max(1, cfg().panelHeight);
+        return Math.max(6, cfg().gap * Math.min(1, scale));
+      };
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, -100, 100);
+      camera.position.z = 10;
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.setCrossOrigin("anonymous");
+      let userInteracted = false;
+
+      const sources = sourceProjects.map((project, index) => {
+        const source = { texture: null, aspect: 1.5, bound: false };
+        const imageUrl = project.image?.src;
+        if (imageUrl) {
+          textureLoader.load(
+            imageUrl,
+            (texture) => {
+              texture.minFilter = THREE.LinearMipmapLinearFilter;
+              texture.generateMipmaps = true;
+              texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+              texture.colorSpace = THREE.SRGBColorSpace;
+              source.aspect = texture.image.width / texture.image.height;
+              source.texture = texture;
+              recomputeTotal();
+              if (!userInteracted) {
+                scroll = centerForIndex(0);
+                target = scroll;
+              }
+              if (staticMode) renderFrame();
+            },
+            undefined,
+            () => {
+              source.texture = makePlaceholderTexture(index, project.brand);
+              if (staticMode) renderFrame();
+            }
+          );
+        } else {
+          source.texture = makePlaceholderTexture(index, project.brand);
+        }
+        return source;
+      });
+
+      const slotWidth = (i) => sources[i].aspect * panelHeightPx() + gapPx();
+      let offsets = [];
+      let totalWidth = 0;
+
+      function recomputeTotal() {
+        offsets = [];
+        let sum = 0;
+        sources.forEach((_, index) => {
+          offsets.push(sum);
+          sum += slotWidth(index);
+        });
+        totalWidth = Math.max(sum, 1);
+      }
+      recomputeTotal();
+
+      function centerForIndex(index) {
+        const count = sources.length;
+        const loop = Math.floor(index / count);
+        const sourceIndex = ((index % count) + count) % count;
+        return offsets[sourceIndex] + slotWidth(sourceIndex) / 2 - gapPx() / 2 + loop * totalWidth;
+      }
+
+      function nearestIndex(value) {
+        let best = 0;
+        let bestDistance = Infinity;
+        for (let i = 0; i < sources.length; i++) {
+          const center = offsets[i] + slotWidth(i) / 2 - gapPx() / 2;
+          const loop = Math.round((value - center) / totalWidth);
+          const distance = Math.abs(center + loop * totalWidth - value);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            best = i + loop * sources.length;
+          }
+        }
+        return best;
+      }
+
+      function centerSourceIndex(value) {
+        let best = 0;
+        let bestDistance = Infinity;
+        for (let i = 0; i < sources.length; i++) {
+          const center = offsets[i] + slotWidth(i) / 2 - gapPx() / 2;
+          const loop = Math.round((value - center) / totalWidth);
+          const distance = Math.abs(center + loop * totalWidth - value);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            best = i;
+          }
+        }
+        return best;
+      }
+
+      const REPEATS = 4;
+      const pool = [];
+      for (let repeat = 0; repeat < REPEATS; repeat++) {
+        for (let i = 0; i < sources.length; i++) {
+          const material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true });
+          const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+          mesh.visible = false;
+          scene.add(mesh);
+          pool.push({ mesh, material, sourceIndex: i });
+        }
+      }
+
+      let scroll = centerForIndex(0);
+      let target = scroll;
+      let previousScroll = scroll;
+      let scrollEnergy = 0;
+      let pendingFocus = null;
+      let lastWheelAt = 0;
+      let snapArmed = false;
+      let lastCenter = -1;
+      
+      let rt = new THREE.WebGLRenderTarget(W * dpr, H * dpr, {
+        format: THREE.RGBAFormat,
+        type: THREE.UnsignedByteType
+      });
+      
+      const lensScene = new THREE.Scene();
+      const lensCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+      const lensUniforms = {
+        uTex: { value: rt.texture },
+        uRes: { value: new THREE.Vector2(W * dpr, H * dpr) },
+        uCenter: { value: new THREE.Vector2(cfg().lensX, cfg().lensY) },
+        uSizeX: { value: cfg().lensWidth },
+        uSizeY: { value: cfg().lensHeight },
+        uShape: { value: cfg().lensShape === "square" ? 1 : 0 },
+        uSquareRound: { value: 0 },
+        uRotation: { value: 0 },
+        uAspect: { value: W / H },
+        uZoom: { value: cfg().zoom },
+        uDispersion: { value: cfg().dispersion },
+        uBlur: { value: cfg().blur },
+        uGlow: { value: cfg().glow },
+        uWhiteGlow: { value: 0.12 },
+        uNovaSize: { value: 12 },
+        uBlueRing: { value: cfg().blueRing },
+        uRingRadius: { value: 0.49 },
+        uRingWidth: { value: 0.014 },
+        uShimmer: { value: cfg().shimmer ? 1 : 0 },
+        uShimmerFreq: { value: 12 },
+        uShimmerSpeed: { value: 3.5 },
+        uShimmerDepth: { value: 0.12 },
+        uTime: { value: 0 },
+        uRimStart: { value: 0.25 },
+        uRimTangential: { value: cfg().rimWave },
+        uRimInward: { value: 0 },
+        uRimFreq1: { value: 2 },
+        uRimFreq2: { value: 1 },
+        uBlueColor: { value: new THREE.Color(cfg().blueColor) },
+        uRimLine: { value: 0.0 },
+        uRimLinePos: { value: 0.488 },
+        uRimLineWidth: { value: 0.003 },
+        uSamples: { value: 16 }
+      };
+
+      const lensMaterial = new THREE.ShaderMaterial({
+        uniforms: lensUniforms,
+        transparent: true,
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = vec4(position.xy, 0.0, 1.0);
+          }
+        `,
+        fragmentShader
+      });
+
+      const lensQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), lensMaterial);
+      lensScene.add(lensQuad);
+
+      const entryEnabled = cfg().entryAnimation && !staticMode;
+      const focusState = { active: false, sourceIndex: -1, poolIndex: -1, lensFx: entryEnabled ? 0 : 1, animation: null };
+      const drop = new Array(pool.length).fill(0);
+      const entry = new Array(pool.length).fill(entryEnabled ? 0 : 1);
+      const grow = new Array(pool.length).fill(entryEnabled ? 0 : 1);
+      const lastCenterX = new Array(pool.length);
+      let focusScale = 1;
+      let entryActive = entryEnabled;
+      let entrySettled = false;
+      let entryTimeline = null;
+      let panelRects = [];
+      let centeredPanel = null;
+
+      function layout() {
+        panelRects = [];
+        centeredPanel = null;
+        let centeredDistance = Infinity;
+        const half = W / 2;
+        const currentPanelHeight = panelHeightPx();
+        const currentGap = gapPx();
+        const buffer = currentPanelHeight;
+
+        pool.forEach((item, poolIndex) => {
+          const repeat = Math.floor(poolIndex / sources.length);
+          const sourceIndex = item.sourceIndex;
+          const source = sources[sourceIndex];
+          const centerInLoop = offsets[sourceIndex] + slotWidth(sourceIndex) / 2 - currentGap / 2;
+          let x = centerInLoop - scroll;
+          x = ((x % totalWidth) + totalWidth) % totalWidth;
+          x += (repeat - Math.floor(REPEATS / 2)) * totalWidth;
+          if (x > half + totalWidth) {
+            x -= totalWidth * REPEATS;
+          }
+          const centerX = x;
+          const inEntry = entryActive || entrySettled;
+          if (!inEntry && (centerX < -half - buffer || centerX > half + buffer)) {
+            item.mesh.visible = false;
+            lastCenterX[poolIndex] = undefined;
+            return;
+          }
+          lastCenterX[poolIndex] = centerX;
+          const shrink = 1 - 0.25 * scrollEnergy;
+          const height = currentPanelHeight * shrink;
+          const width = source.aspect * currentPanelHeight * shrink;
+
+          if (source.texture && !item.bound) {
+            item.material.map = source.texture;
+            item.material.color.set(0xffffff);
+            item.material.needsUpdate = true;
+            item.bound = true;
+          }
+
+          let y = 0;
+          let drawWidth = width;
+          let drawHeight = height;
+          const isFocused = focusState.active && focusState.poolIndex === poolIndex;
+          if (isFocused) {
+            drawWidth *= focusScale;
+            drawHeight *= focusScale;
+          } else if (drop[poolIndex] > 0) {
+            y = -drop[poolIndex] * H * 1.4;
+          }
+
+          let finalX = centerX;
+          let finalY = y;
+          let finalWidth = drawWidth;
+          let finalHeight = drawHeight;
+
+          if (inEntry) {
+            const p = entry[poolIndex];
+            const g = grow[poolIndex];
+            const entryMin = Math.min(80, currentPanelHeight * 0.35);
+            const currentHeight = entryMin + (drawHeight - entryMin) * g;
+            finalHeight = currentHeight;
+            finalWidth = currentHeight * source.aspect;
+            const centeredSource = centerSourceIndex(scroll);
+            let distanceIndex = sourceIndex - centeredSource;
+            if (distanceIndex > sources.length / 2) distanceIndex -= sources.length;
+            if (distanceIndex < -sources.length / 2) distanceIndex += sources.length;
+            const middleRepeat = Math.floor(REPEATS / 2);
+            if (repeat !== middleRepeat) {
+              item.mesh.visible = false;
+              lastCenterX[poolIndex] = undefined;
+              return;
+            }
+            const currentSlotHeight = (s) => entryMin + (currentPanelHeight - entryMin) * grow[middleRepeat * sources.length + s];
+            let offset = 0;
+            if (distanceIndex > 0) {
+              for (let k = 0; k < distanceIndex; k++) {
+                const a = (centeredSource + k) % sources.length;
+                const b = (centeredSource + k + 1) % sources.length;
+                offset += (sources[a].aspect * currentSlotHeight(a) + sources[b].aspect * currentSlotHeight(b)) / 2 + currentGap;
+              }
+            } else if (distanceIndex < 0) {
+              for (let k = 0; k < -distanceIndex; k++) {
+                const a = (((centeredSource - k) % sources.length) + sources.length) % sources.length;
+                const b = (((centeredSource - k - 1) % sources.length) + sources.length) % sources.length;
+                offset -= (sources[a].aspect * currentSlotHeight(a) + sources[b].aspect * currentSlotHeight(b)) / 2 + currentGap;
+              }
+            }
+            finalX = offset;
+            const below = -H * 0.9;
+            finalY = below + (y - below) * p;
+          }
+
+          item.mesh.visible = true;
+          item.mesh.position.set(finalX, finalY, 0);
+          item.mesh.scale.set(finalWidth, finalHeight, 1);
+
+          const screenX = centerX + W / 2;
+          const screenY = H / 2 - y;
+          panelRects.push({
+            left: screenX - drawWidth / 2,
+            right: screenX + drawWidth / 2,
+            top: screenY - drawHeight / 2,
+            bottom: screenY + drawHeight / 2,
+            poolIndex,
+            sourceIndex,
+            centerX
+          });
+
+          if (Math.abs(centerX) < centeredDistance) {
+            centeredDistance = Math.abs(centerX);
+            centeredPanel = { sourceIndex, poolIndex, centerX };
+          }
+        });
+      }
+
+      function panelAt(x, y) {
+        return panelRects.find((rect) => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) || null;
+      }
+
+      const canvas = renderer.domElement;
+      if (cursorElement) {
+        gsap.set(cursorElement, { xPercent: 20, yPercent: 30, scale: 0, autoAlpha: 0 });
+      }
+      const moveX = cursorElement ? gsap.quickTo(cursorElement, "x", { duration: 0.5, ease: "power3.out" }) : null;
+      const moveY = cursorElement ? gsap.quickTo(cursorElement, "y", { duration: 0.5, ease: "power3.out" }) : null;
+      let overPanel = false;
+
+      function setView(visible) {
+        if (entryActive || entrySettled) visible = false;
+        canvas.style.cursor = visible ? "pointer" : "";
+        if (visible === overPanel || !cursorElement) return;
+        overPanel = visible;
+        gsap.to(cursorElement, {
+          scale: visible ? 1 : 0,
+          autoAlpha: visible ? 1 : 0,
+          duration: visible ? 0.35 : 0.25,
+          ease: visible ? "power3.out" : "power3.in"
+        });
+      }
+
+      function localPointer(event) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      }
+
+      let dragPointerId = null;
+      let dragOriginX = 0;
+      let dragOriginTarget = 0;
+      let dragMoved = false;
+      let suppressClick = false;
+
+      function onWheel(event) {
+        event.preventDefault();
+        if (focusState.active || entryActive || entrySettled) return;
+        userInteracted = true;
+        pendingFocus = null;
+        target += (event.deltaY || event.deltaX) * cfg().wheelSensitivity;
+        lastWheelAt = performance.now();
+        snapArmed = true;
+      }
+
+      function onPointerDown(event) {
+        if (focusState.active || entryActive || entrySettled) return;
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        dragPointerId = event.pointerId;
+        dragOriginX = event.clientX;
+        dragOriginTarget = target;
+        dragMoved = false;
+        userInteracted = true;
+        pendingFocus = null;
+        canvas.setPointerCapture?.(event.pointerId);
+      }
+
+      function onPointerMove(event) {
+        const point = localPointer(event);
+        if (moveX) moveX(point.x);
+        if (moveY) moveY(point.y);
+        if (dragPointerId === event.pointerId) {
+          const dx = event.clientX - dragOriginX;
+          if (Math.abs(dx) > 6) dragMoved = true;
+          target = dragOriginTarget - dx * cfg().wheelSensitivity;
+          lastWheelAt = performance.now();
+          snapArmed = true;
+          setView(false);
+          return;
+        }
+        if (focusState.active) return setView(false);
+        if (event.pointerType === "mouse") {
+          setView(panelAt(point.x, point.y) !== null);
+        }
+      }
+
+      function onPointerUp(event) {
+        if (dragPointerId !== event.pointerId) return;
+        canvas.releasePointerCapture?.(event.pointerId);
+        dragPointerId = null;
+        if (dragMoved) {
+          suppressClick = true;
+          lastWheelAt = performance.now();
+          snapArmed = true;
+        }
+      }
+
+      function onPointerLeave() {
+        if (dragPointerId !== null) return;
+        setView(false);
+      }
+
+      function onClick(event) {
+        if (suppressClick) {
+          suppressClick = false;
+          return;
+        }
+        if (focusState.active || entryActive || entrySettled) return;
+        const point = localPointer(event);
+        const hit = panelAt(point.x, point.y);
+        if (!hit) return;
+        if (centeredPanel && hit.poolIndex === centeredPanel.poolIndex) {
+          openFocus();
+          return;
+        }
+        userInteracted = true;
+        target = centerForIndex(nearestIndex(scroll + hit.centerX));
+        pendingFocus = { sourceIndex: hit.sourceIndex };
+        setView(false);
+      }
+
+      function openFocus() {
+        if (focusState.active || !centeredPanel) return;
+        focusState.active = true;
+        focusState.sourceIndex = centeredPanel.sourceIndex;
+        focusState.poolIndex = centeredPanel.poolIndex;
+        target = centerForIndex(nearestIndex(scroll));
+        const focusX = lastCenterX[focusState.poolIndex] || 0;
+        const others = pool
+          .map((_, index) => ({ index, x: lastCenterX[index] }))
+          .filter((item) => item.index !== focusState.poolIndex && item.x !== undefined)
+          .map((item) => ({ ...item, distance: Math.abs(item.x - focusX) }))
+          .sort((a, b) => a.distance - b.distance);
+
+        let rank = 0;
+        let previousDistance = -1;
+        const ranked = others.map((item) => {
+          if (previousDistance >= 0 && item.distance - previousDistance > 1) rank++;
+          previousDistance = item.distance;
+          return { index: item.index, rank };
+        });
+
+        focusState.animation?.kill();
+        const timeline = gsap.timeline();
+        timeline.to(focusState, { lensFx: 0, duration: 0.85, ease: "power3.out" }, 0);
+        const scaleState = { value: focusScale };
+        timeline.to(scaleState, {
+          value: cfg().focusScale,
+          duration: 0.9,
+          ease: "power3.out",
+          onUpdate: () => (focusScale = scaleState.value)
+        }, 0);
+        ranked.forEach((item) => {
+          timeline.to(drop, { [item.index]: 1, duration: 0.7, ease: "power4.out" }, item.rank * 0.06);
+        });
+        focusState.animation = timeline;
+        setView(false);
+        onFocusChange(true);
+      }
+
+      function closeFocus() {
+        if (!focusState.active) return;
+        focusState.animation?.kill();
+        onFocusChange(false);
+        const focusX = lastCenterX[focusState.poolIndex] || 0;
+        const others = pool
+          .map((_, index) => ({ index, x: lastCenterX[index] }))
+          .filter((item) => item.x !== undefined && (drop[item.index] || 0) > 0)
+          .map((item) => ({ ...item, distance: Math.abs(item.x - focusX) }))
+          .sort((a, b) => b.distance - a.distance);
+
+        const timeline = gsap.timeline({
+          onComplete: () => {
+            focusState.active = false;
+            focusState.sourceIndex = -1;
+          }
+        });
+        timeline.to(focusState, { lensFx: 1, duration: 0.68, ease: "power3.inOut" }, 0);
+        const scaleState = { value: focusScale };
+        timeline.to(scaleState, {
+          value: 1,
+          duration: 0.76,
+          ease: "power3.out",
+          onUpdate: () => (focusScale = scaleState.value)
+        }, 0);
+        others.forEach((item, index) => {
+          timeline.to(drop, { [item.index]: 0, duration: 0.6, ease: "power4.out" }, index * 0.035);
+        });
+        focusState.animation = timeline;
+      }
+
+      function playEntry() {
+        if (!entryEnabled) {
+          onEntryDone(true);
+          return;
+        }
+        entryTimeline?.kill();
+        entry.fill(0);
+        grow.fill(0);
+        entryActive = true;
+        entrySettled = false;
+        focusState.lensFx = 0;
+        onEntryDone(false);
+        target = centerForIndex(nearestIndex(scroll));
+        scroll = target;
+        layout();
+        const visible = lastCenterX.map((x, index) => (x === undefined ? -1 : index)).filter((index) => index >= 0);
+        const timeline = gsap.timeline({ delay: 0.5 });
+        const spread = 0.07 * Math.max(visible.length - 1, 1);
+        let lastRiseEnd = 0;
+        visible.forEach((index) => {
+          const at = Math.random() * spread;
+          lastRiseEnd = Math.max(lastRiseEnd, at + 1);
+          timeline.to(entry, { [index]: 1, duration: 1, ease: "power3.out" }, at);
+        });
+        timeline.call(() => {
+          entryActive = false;
+          entrySettled = true;
+        }, undefined, lastRiseEnd);
+
+        const center = centerSourceIndex(scroll);
+        const middleRepeat = Math.floor(REPEATS / 2);
+        const growList = [];
+        let maxRank = 0;
+        for (let i = 0; i < sources.length; i++) {
+          let distance = i - center;
+          if (distance > sources.length / 2) distance -= sources.length;
+          if (distance < -sources.length / 2) distance += sources.length;
+          const distanceRank = Math.abs(distance);
+          maxRank = Math.max(maxRank, distanceRank);
+          growList.push({ index: middleRepeat * sources.length + i, distanceRank });
+        }
+        const growStart = lastRiseEnd + 0.25;
+        let growEnd = growStart;
+        timeline.to(focusState, { lensFx: 1, duration: 1.4, ease: "power2.inOut" }, growStart);
+        growList.forEach((item) => {
+          const rank = maxRank - item.distanceRank;
+          const at = growStart + rank * 0.085;
+          growEnd = Math.max(growEnd, at + 2.15);
+          timeline.to(grow, { [item.index]: 1, duration: 2.15, ease: "expo.inOut" }, at);
+        });
+        timeline.call(() => {
+          entrySettled = false;
+          grow.fill(1);
+          onEntryDone(true);
+        }, undefined, growEnd);
+        entryTimeline = timeline;
+      }
+
+      canvas.addEventListener("wheel", onWheel, { passive: false });
+      canvas.addEventListener("pointerdown", onPointerDown);
+      canvas.addEventListener("pointermove", onPointerMove);
+      canvas.addEventListener("pointerup", onPointerUp);
+      canvas.addEventListener("pointercancel", onPointerUp);
+      canvas.addEventListener("pointerleave", onPointerLeave);
+      canvas.addEventListener("click", onClick);
+
+      let raf = 0;
+      function renderFrame() {
+        const values = cfg();
+        renderer.setClearColor(0x000000, 0);
+        if (values.snap && snapArmed && !focusState.active && Math.abs(target - scroll) < values.snapDistance && performance.now() - lastWheelAt > values.snapDelay) {
+          target = centerForIndex(nearestIndex(target));
+          snapArmed = false;
+        }
+        scroll += (target - scroll) * values.glide;
+        const centerIndex = centerSourceIndex(scroll);
+        if (centerIndex !== lastCenter) {
+          lastCenter = centerIndex;
+          onActiveChange(centerIndex);
+        }
+        const speed = scroll - previousScroll;
+        previousScroll = scroll;
+        const normalized = Math.min(1, Math.abs(speed) / Math.max(1, values.speedShrink));
+        const energyEase = normalized > scrollEnergy ? 0.25 : 0.06;
+        scrollEnergy += (normalized - scrollEnergy) * energyEase;
+        layout();
+        if (pendingFocus && !focusState.active && Math.abs(target - scroll) < 0.5) {
+          const pending = pendingFocus;
+          pendingFocus = null;
+          if (centeredPanel && centeredPanel.sourceIndex === pending.sourceIndex) {
+            openFocus();
+          }
+        }
+        lensUniforms.uCenter.value.set(values.lensX, values.lensY);
+        lensUniforms.uSizeX.value = values.lensWidth;
+        lensUniforms.uSizeY.value = values.lensHeight;
+        lensUniforms.uShape.value = values.lensShape === "square" ? 1 : 0;
+        lensUniforms.uRotation.value = (values.lensRotation * Math.PI) / 180;
+        lensUniforms.uAspect.value = W / H;
+        lensUniforms.uTime.value = performance.now() * 0.001;
+        lensUniforms.uBlur.value = values.blur;
+        lensUniforms.uGlow.value = values.glow;
+        lensUniforms.uShimmer.value = values.shimmer ? 1 : 0;
+        lensUniforms.uBlueColor.value.set(values.blueColor);
+        const fx = focusState.lensFx;
+        lensUniforms.uDispersion.value = values.dispersion * fx;
+        lensUniforms.uBlueRing.value = values.blueRing * fx;
+        lensUniforms.uRimLine.value = 0.0;
+        lensUniforms.uZoom.value = values.zoom * fx;
+        lensUniforms.uRimTangential.value = values.rimWave * fx;
+
+        renderer.setRenderTarget(rt);
+        renderer.clear();
+        renderer.render(scene, camera);
+        
+        renderer.setRenderTarget(null);
+        renderer.render(lensScene, lensCamera);
+      }
+
+      function tick() {
+        renderFrame();
+        raf = requestAnimationFrame(tick);
+      }
+
+      if (staticMode) {
+        renderFrame();
+      } else {
+        tick();
+      }
+      playEntry();
+
+      function onResize() {
+        W = Math.max(1, mount.clientWidth);
+        H = Math.max(1, mount.clientHeight);
+        renderer.setSize(W, H);
+        camera.left = -W / 2;
+        camera.right = W / 2;
+        camera.top = H / 2;
+        camera.bottom = -H / 2;
+        camera.updateProjectionMatrix();
+        rt.setSize(W * dpr, H * dpr);
+        lensUniforms.uRes.value.set(W * dpr, H * dpr);
+        recomputeTotal();
+        if (staticMode) renderFrame();
+      }
+
+      const resizeObserver = new ResizeObserver(onResize);
+      resizeObserver.observe(mount);
+
+      function destroy() {
+        try {
+          cancelAnimationFrame(raf);
+          resizeObserver.disconnect();
+          canvas.removeEventListener("wheel", onWheel);
+          canvas.removeEventListener("pointerdown", onPointerDown);
+          canvas.removeEventListener("pointermove", onPointerMove);
+          canvas.removeEventListener("pointerup", onPointerUp);
+          canvas.removeEventListener("pointercancel", onPointerUp);
+          canvas.removeEventListener("pointerleave", onPointerLeave);
+          canvas.removeEventListener("click", onClick);
+          focusState.animation?.kill();
+          entryTimeline?.kill();
+          if (cursorElement) gsap.killTweensOf(cursorElement);
+          renderer.dispose();
+          rt.dispose();
+          lensQuad.geometry.dispose();
+          lensMaterial.dispose();
+          pool.forEach((item) => {
+            item.mesh.geometry.dispose();
+            item.material.dispose();
+          });
+          sources.forEach((source) => source.texture?.dispose());
+          renderer.domElement.remove();
+        } catch (error) {
+          console.error("LiquidGlassCarousel cleanup failed", error);
+        }
+      }
+
+      return { closeFocus, destroy };
+    }
+
+    function LiquidGlassCarousel(props) {
+      const { projects, background, foreground, showCursor, font, style } = props;
+      const mountRef = React.useRef(null);
+      const cursorRef = React.useRef(null);
+      const engineRef = React.useRef(null);
+      const propsRef = React.useRef(props);
+      propsRef.current = props;
+      const staticMode = false;
+      const [active, setActive] = React.useState(0);
+      const [focused, setFocused] = React.useState(false);
+      const [entryDone, setEntryDone] = React.useState(!props.entryAnimation);
+      const [canHover, setCanHover] = React.useState(() => {
+        if (typeof window === "undefined" || !window.matchMedia) return true;
+        return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+      });
+
+      const projectKey = React.useMemo(
+        () => projects.map((project) => `${project.image?.src || ""}|${project.brand}|${project.description}`).join("::"),
+        [projects]
+      );
+
+      React.useEffect(() => {
+        if (typeof window === "undefined" || !window.matchMedia) return;
+        const media = window.matchMedia("(hover: hover) and (pointer: fine)");
+        const update = () => setCanHover(media.matches);
+        update();
+        media.addEventListener?.("change", update);
+        return () => media.removeEventListener?.("change", update);
+      }, []);
+
+      const [initializationError, setInitializationError] = React.useState(null);
+      const cursorEnabled = showCursor && canHover;
+
+      React.useEffect(() => {
+        if (!mountRef.current) return;
+        setInitializationError(null);
+        try {
+          engineRef.current = createCarousel(mountRef.current, {
+            projects,
+            propsRef,
+            cursorElement: cursorEnabled ? cursorRef.current : null,
+            staticMode,
+            onActiveChange: setActive,
+            onFocusChange: setFocused,
+            onEntryDone: setEntryDone
+          });
+        } catch (error) {
+          console.error("LiquidGlassCarousel failed to initialize", error);
+          engineRef.current = null;
+          setFocused(false);
+          setEntryDone(true);
+          setInitializationError("The carousel could not initialize its graphics engine.");
+        }
+        return () => {
+          try {
+            engineRef.current?.destroy();
+          } catch (error) {
+            console.error("LiquidGlassCarousel destroy failed", error);
+          }
+          engineRef.current = null;
+        };
+      }, [projectKey, cursorEnabled, staticMode, props.panelHeight, props.gap, props.entryAnimation, props.pixelRatio]);
+
+      if (initializationError) {
+        return _jsx("div", {
+          role: "status",
+          style: {
+            ...style,
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 32,
+            boxSizing: "border-box",
+            textAlign: "center",
+            color: foreground,
+            background: "transparent",
+            ...font
+          },
+          children: initializationError
+        });
+      }
+
+      return _jsxs("div", {
+        style: {
+          ...style,
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+          background: "transparent",
+          color: foreground,
+          touchAction: "none",
+          ...font
+        },
+        children: [
+          _jsx("div", { ref: mountRef, style: { position: "absolute", inset: 0, touchAction: "none", background: "transparent" } }),
+          cursorEnabled &&
+            _jsx("div", {
+              ref: cursorRef,
+              style: {
+                position: "absolute",
+                top: 0,
+                left: 0,
+                zIndex: 4,
+                pointerEvents: "none",
+                whiteSpace: "nowrap",
+                mixBlendMode: "exclusion",
+                color: "#ffffff",
+                willChange: "transform",
+                fontSize: "0.75rem",
+                fontWeight: "bold",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase"
+              },
+              children: "Drag / View"
+            }),
+          _jsx("button", {
+            type: "button",
+            "aria-label": "Close focused project",
+            onClick: () => engineRef.current?.closeFocus(),
+            style: {
+              position: "absolute",
+              top: "1.5vh",
+              right: "4vw",
+              zIndex: 5,
+              padding: "4px 12px",
+              borderRadius: "9999px",
+              border: "1px solid rgba(255,255,255,0.2)",
+              background: "rgba(0,0,0,0.6)",
+              color: "#ffffff",
+              fontWeight: "600",
+              fontSize: "0.75rem",
+              cursor: "pointer",
+              opacity: focused ? 1 : 0,
+              pointerEvents: focused ? "auto" : "none",
+              transition: "opacity .3s",
+              ...font
+            },
+            children: "Close ✕"
+          })
+        ]
+      });
+    }
+
+    LiquidGlassCarousel.defaultProps = {
+      projects: [
+        { brand: "Aesthetic Velocity", description: "Viral CapCut Formula", image: { src: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80" } },
+        { brand: "3D Split Zoom", description: "High Retention Transition", image: { src: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80" } },
+        { brand: "Dark Atmosphere", description: "Prompt Vault Master", image: { src: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?auto=format&fit=crop&w=800&q=80" } },
+        { brand: "Kinetic Motion", description: "#1 Ranked in UK", image: { src: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&w=800&q=80" } },
+        { brand: "Cyberpunk Glitch", description: "Compound Payout Stack", image: { src: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80" } }
+      ],
+      panelHeight: 260,
+      gap: 14,
+      glide: 0.075,
+      wheelSensitivity: 1,
+      snap: true,
+      snapDistance: 60,
+      snapDelay: 120,
+      speedShrink: 60,
+      lensShape: "circle",
+      lensRotation: 65,
+      lensWidth: 1.15,
+      lensHeight: 1.25,
+      lensX: 0.5,
+      lensY: 0.5,
+      dispersion: 4.0,
+      zoom: 0.15,
+      blur: 0,
+      glow: 1.8,
+      blueRing: 1.2,
+      blueColor: "#ffffff",
+      shimmer: true,
+      rimWave: 0.35,
+      entryAnimation: true,
+      focusScale: 1.15,
+      background: "transparent",
+      foreground: "#ffffff",
+      showLabels: false,
+      showCursor: true,
+      font: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, fontWeight: 500, lineHeight: "1.25em" },
+      pixelRatio: 2
+    };
+
+    const container = document.getElementById("liquid-glass-carousel-root");
+    if (container) {
+      const root = createRoot(container);
+      root.render(React.createElement(LiquidGlassCarousel, { ...LiquidGlassCarousel.defaultProps }));
+    }
+  </script>
+
+</body>
+</html>
