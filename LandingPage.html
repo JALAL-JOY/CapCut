@@ -209,9 +209,9 @@
           <a href="#comparison" class="hover:text-white transition">Why Us</a>
           <a href="#faq" class="hover:text-white transition">FAQ</a>
         </div>
-        <a href="#apply" class="px-5 py-2 text-xs font-semibold uppercase tracking-wider rounded-full bg-white text-black hover:bg-slate-200 transition">
+        <button onclick="document.getElementById('apply-modal').classList.remove('hidden')" class="px-5 py-2 text-xs font-semibold uppercase tracking-wider rounded-full bg-white text-black hover:bg-slate-200 transition">
           Apply Now &rarr;
-        </a>
+        </button>
       </div>
     </nav>
 
@@ -247,9 +247,9 @@
       </div>
 
       <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-        <a href="#apply" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-white text-black font-bold text-sm sm:text-base hover:bg-slate-200 transition shadow-lg">
+        <button onclick="document.getElementById('apply-modal').classList.remove('hidden')" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-white text-black font-bold text-sm sm:text-base hover:bg-slate-200 transition shadow-lg">
           Apply to Join The System &rarr;
-        </a>
+        </button>
       </div>
     </header>
 
@@ -609,9 +609,9 @@
         <p class="text-slate-400 max-w-xl mx-auto mb-8 text-xs sm:text-base leading-relaxed">
           Join 250+ creators building predictable passive income with viral templates.
         </p>
-        <a href="#apply" class="inline-block px-10 py-4 rounded-xl bg-white text-black font-extrabold text-sm sm:text-base hover:bg-slate-200 transition shadow-[0_0_30px_rgba(255,255,255,0.3)]">
+        <button onclick="document.getElementById('apply-modal').classList.remove('hidden')" class="inline-block px-10 py-4 rounded-xl bg-white text-black font-extrabold text-sm sm:text-base hover:bg-slate-200 transition shadow-[0_0_30px_rgba(255,255,255,0.3)]">
           Apply to Join The System &rarr;
-        </a>
+        </button>
         <p class="text-[11px] text-slate-500 mt-4">Takes ~2 minutes · Response guaranteed within 24 hours</p>
       </div>
     </section>
@@ -621,6 +621,237 @@
     </footer>
 
   </div>
+
+  <div id="apply-modal" class="fixed inset-0 z-[100] hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-black border border-white/20 rounded-3xl p-6 sm:p-8 w-full max-w-lg relative shadow-[0_0_50px_rgba(34,211,238,0.15)] overflow-hidden">
+      <!-- Orbital canvas inside modal -->
+      <div class="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent pointer-events-none z-0"></div>
+      <canvas id="modal-orbital-canvas" class="absolute inset-0 pointer-events-none z-0 opacity-50"></canvas>
+      
+      <button onclick="document.getElementById('apply-modal').classList.add('hidden')" class="absolute top-6 right-6 text-slate-400 hover:text-white transition z-20">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      <div class="relative z-10">
+        <h3 class="text-2xl font-black text-white tracking-tight mb-2">Join The System</h3>
+        <p class="text-slate-400 text-sm mb-6">Fill out the form below to apply.</p>
+
+        <div id="apply-error-message" class="hidden mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-semibold text-center"></div>
+        <div id="apply-success-message" class="hidden mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs font-semibold text-center">
+          Application Received! We will review it shortly.
+        </div>
+
+        <form id="apply-form" action="https://formsubmit.co/ajax/filalihiba2115@gmail.com" method="POST" class="space-y-4" novalidate>
+          <input type="hidden" name="_captcha" value="false">
+          <input type="hidden" name="_template" value="table">
+          
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Full Name</label>
+            <input type="text" name="name" id="apply-name" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition" placeholder="Jack Young">
+          </div>
+          
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
+            <input type="email" name="email" id="apply-email" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition" placeholder="jack@example.com">
+          </div>
+          
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Country</label>
+            <select name="country" id="apply-country" onchange="document.getElementById('other-country-container').classList.toggle('hidden', this.value !== 'OTHER')" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-400 transition appearance-none cursor-pointer">
+              <option value="" disabled selected class="bg-black text-slate-400">Select your country</option>
+              <option value="US" class="bg-black">United States</option>
+              <option value="UK" class="bg-black">United Kingdom</option>
+              <option value="CA" class="bg-black">Canada</option>
+              <option value="AU" class="bg-black">Australia</option>
+              <option value="EU" class="bg-black">Europe</option>
+              <option value="OTHER" class="bg-black">Other</option>
+            </select>
+          </div>
+          
+          <div id="other-country-container" class="hidden">
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Specific Country</label>
+            <input type="text" name="specific_country" id="apply-specific-country" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition" placeholder="Enter your country">
+          </div>
+
+          <div class="flex gap-4">
+            <div class="flex-1">
+              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Insta Username</label>
+              <input type="text" name="instagram" id="apply-insta" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition" placeholder="@jackyoung">
+            </div>
+            <div class="flex-1">
+              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Discord ID</label>
+              <input type="text" name="discord" id="apply-discord" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition" placeholder="jack#1234">
+            </div>
+          </div>
+          
+          <button type="submit" id="apply-submit-btn" class="w-full mt-6 px-8 py-4 rounded-xl bg-white text-black font-extrabold text-sm sm:text-base hover:bg-slate-200 transition shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+            Send Application &rarr;
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const modal = document.getElementById('apply-modal');
+      const form = document.getElementById('apply-form');
+      const errorDiv = document.getElementById('apply-error-message');
+      const successDiv = document.getElementById('apply-success-message');
+      const submitBtn = document.getElementById('apply-submit-btn');
+
+      // Setup orbital canvas for modal
+      const mCanvas = document.getElementById('modal-orbital-canvas');
+      const mCtx = mCanvas.getContext('2d');
+      let mDots = [];
+      let mMouse = { x: -2000, y: -2000 };
+      let mGlobalTime = 0;
+      let mWidth = 0, mHeight = 0, mDpr = window.devicePixelRatio || 1;
+
+      class ModalDot {
+        constructor(x, y) {
+          this.ox=x; this.oy=y; this.x=x; this.y=y;
+          this.inc=Math.random()*Math.PI;
+          this.asc=Math.random()*Math.PI*2;
+          this.poff=Math.random()*Math.PI*2;
+          this.orad=8+Math.random()*18;
+          this.ow=0; this.sc=1.0; this.al=0.2;
+        }
+        update() {
+          const dx = mMouse.x - this.ox;
+          const dy = mMouse.y - this.oy;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          let tw = 0;
+          if(dist < 65) tw = Math.pow(1 - dist/65, 1.4);
+          this.ow += (tw - this.ow) * 0.2;
+          if (this.ow > 0.001) {
+            const t = mGlobalTime * 0.07 + this.poff;
+            const rx = Math.cos(t) * this.orad;
+            const ry = Math.sin(t) * this.orad;
+            const ci=Math.cos(this.inc), si=Math.sin(this.inc);
+            const ca=Math.cos(this.asc), sa=Math.sin(this.asc);
+            const x3 = rx*ca - ry*ci*sa;
+            const y3 = rx*sa + ry*ci*ca;
+            const z3 = ry*si;
+            const p = 1 + z3*0.02;
+            const tx = this.ox + x3*p;
+            const ty = this.oy + y3*p;
+            this.x = this.ox + (tx - this.ox) * this.ow;
+            this.y = this.oy + (ty - this.oy) * this.ow;
+            this.sc = (1.0 + (2.0 - 1.0) * this.ow) * p;
+            this.al = 0.2 + this.ow * 0.8;
+          } else {
+            this.x = this.ox; this.y = this.oy;
+            this.sc = 1.0; this.al = 0.2;
+          }
+        }
+        draw() {
+          mCtx.beginPath();
+          mCtx.arc(this.x, this.y, Math.max(0.4, this.sc), 0, Math.PI*2);
+          mCtx.fillStyle = 'rgba(255,255,255,' + this.al + ')';
+          mCtx.fill();
+        }
+      }
+      function initMGrid() {
+        mDots = [];
+        const cols = Math.floor(mWidth / 20);
+        const rows = Math.floor(mHeight / 20);
+        const sx = (mWidth - cols*20)/2;
+        const sy = (mHeight - rows*20)/2;
+        for (let i=0; i<=cols; i++) {
+          for (let j=0; j<=rows; j++) {
+            mDots.push(new ModalDot(sx + i*20, sy + j*20));
+          }
+        }
+      }
+      function resizeM() {
+        if (!modal || modal.classList.contains('hidden')) return;
+        const rect = mCanvas.parentElement.getBoundingClientRect();
+        mWidth = rect.width; mHeight = rect.height;
+        mCanvas.width = mWidth * mDpr; mCanvas.height = mHeight * mDpr;
+        mCanvas.style.width = mWidth + 'px'; mCanvas.style.height = mHeight + 'px';
+        mCtx.scale(mDpr, mDpr);
+        initMGrid();
+      }
+      window.addEventListener('resize', resizeM);
+      const mObserver = new MutationObserver((mutations) => {
+        mutations.forEach((m) => {
+          if (m.attributeName === 'class' && !modal.classList.contains('hidden')) {
+            resizeM();
+          }
+        });
+      });
+      if(modal) mObserver.observe(modal, { attributes: true });
+      if(modal) {
+        modal.addEventListener('mousemove', (e) => {
+          const r = mCanvas.getBoundingClientRect();
+          mMouse.x = e.clientX - r.left; mMouse.y = e.clientY - r.top;
+        });
+        modal.addEventListener('mouseleave', () => { mMouse.x = -2000; mMouse.y = -2000; });
+      }
+      function animateM() {
+        mGlobalTime += 1;
+        if(mWidth>0 && mHeight>0 && !modal.classList.contains('hidden')) {
+          mCtx.clearRect(0,0, mWidth, mHeight);
+          for(let d of mDots) { d.update(); d.draw(); }
+        }
+        requestAnimationFrame(animateM);
+      }
+      animateM();
+
+      function showError(msg) {
+        errorDiv.textContent = msg;
+        errorDiv.classList.remove('hidden');
+        successDiv.classList.add('hidden');
+      }
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        errorDiv.classList.add('hidden');
+        successDiv.classList.add('hidden');
+
+        const name = document.getElementById('apply-name').value.trim();
+        const email = document.getElementById('apply-email').value.trim();
+        const country = document.getElementById('apply-country').value;
+        const sCountry = document.getElementById('apply-specific-country').value.trim();
+        const insta = document.getElementById('apply-insta').value.trim();
+        const discord = document.getElementById('apply-discord').value.trim();
+
+        if (!name) return showError("Please enter your full name.");
+        if (!email || !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) return showError("Please enter a valid email address.");
+        if (!country) return showError("Please select your country.");
+        if (country === 'OTHER' && !sCountry) return showError("Please enter your specific country.");
+        if (!insta && !discord) return showError("Please provide at least your Instagram or Discord.");
+
+        const formData = new FormData(form);
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        fetch(form.action, {
+          method: 'POST',
+          body: formData,
+          headers: { 'Accept': 'application/json' }
+        }).then(res => res.json()).then(data => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Application';
+          // Fix for the Activation message logic:
+          if (data.success || (data.message && data.message.includes('Activation'))) {
+            successDiv.classList.remove('hidden');
+            form.reset();
+            document.getElementById('other-country-container').classList.add('hidden');
+          } else {
+            showError("Something went wrong. Please try again.");
+          }
+        }).catch(err => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Application';
+          showError("Network error. Please try again later.");
+        });
+      });
+    })();
+  </script>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
